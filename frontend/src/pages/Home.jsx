@@ -23,7 +23,7 @@ export default function Home() {
 
       {/* Results & Chatbot Container */}
       {analysisResult && !isLoading && (
-        <div className="flex flex-col xl:flex-row gap-6 lg:gap-8 w-full max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8 pb-20 pt-8 animate-in fade-in slide-in-from-bottom-8 duration-700">
+        <div className="flex flex-col xl:flex-row xl:items-start gap-6 lg:gap-8 w-full max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8 pb-20 pt-8 animate-in fade-in slide-in-from-bottom-8 duration-700">
           
           {/* Main Dashboard Panel */}
           <div className="flex-1 min-w-0">
