@@ -52,5 +52,10 @@ Build for generalizability, not just your demo repo.
 
 analysis this all file and add black and white background buttion and improve the backgroud , and the input buttorn 
 
+analyze this all file and i want to add some feature in that 1. in the ui see like github means , folder structure see and as well as folder shown in github like 
+2. I need ai chat bot option if user cant understand the repository and they ask question about same repository after paste the link , the chat bot shown in the right side like antigravity shown the ai agent in their ide like this 
+3. create best ui for the best user experiance 
+4. wee see te technology stack using in the git repo but we can't see the version of the technology stack then , also add the version of the technology stack
+
 
 
