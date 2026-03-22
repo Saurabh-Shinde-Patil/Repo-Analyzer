@@ -125,7 +125,12 @@ class AnalysisService {
             { "name": "<VAR_NAME>", "usedIn": "<file path>", "description": "<purpose of this env var>" }
           ],
           "summary": {
-            "techStack": ["<tech 1>", "<tech 2>"],
+            "techStack": [
+              {
+                "name": "<tech 1>",
+                "version": "<version 1 or 'Unknown'>"
+              }
+            ],
             "architecture": "<mvc, microservices, etc>",
             "keyDesignDecisions": ["<decision 1...>", "<decision 2...>"],
             "summary": "<1 paragraph overarching summary of what the project is>"
@@ -150,7 +155,8 @@ class AnalysisService {
         bugs: parsedData.bugs || [],
         apiEndpoints: parsedData.apiEndpoints || [],
         envVars: parsedData.envVars || [],
-        repo: `${owner}/${repo}`
+        repo: `${owner}/${repo}`,
+        fileTree: treeData
       };
 
     } catch (error) {
