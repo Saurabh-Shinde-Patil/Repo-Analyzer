@@ -29,7 +29,8 @@ export default function Chatbot({ repositoryUrl, provider }) {
     setIsLoading(true);
 
     try {
-      const response = await axios.post('http://localhost:5000/api/analyze/chat', {
+      const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+      const response = await axios.post(`${API_URL}/api/analyze/chat`, {
         githubUrl: repositoryUrl,
         provider: provider,
         question: userMessage
