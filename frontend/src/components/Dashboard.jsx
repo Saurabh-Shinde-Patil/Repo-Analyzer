@@ -1,8 +1,9 @@
-import { FolderTree, PlayCircle, Network, ArrowRight, ShieldAlert, FileCode, CheckCircle, BrainCircuit, FileSearch, BookOpen, Flame, ArrowDown, Globe, KeyRound, Home } from 'lucide-react';
+import { FolderTree, PlayCircle, Network, ArrowRight, ShieldAlert, FileCode, CheckCircle, BrainCircuit, FileSearch, BookOpen, Flame, ArrowDown, Globe, KeyRound, Home, Blocks } from 'lucide-react';
+import GitHubTree from './GitHubTree';
 
 export default function Dashboard({ data, onReset }) {
   // Expected structure based on new JSON schema from backend
-  const { summary, b2, m1, m2, m3, criticalFiles, bugs, apiEndpoints, envVars } = data;
+  const { summary, b2, m1, m2, m3, criticalFiles, bugs, apiEndpoints, envVars, fileTree } = data;
 
   const panelClass = "bg-white dark:bg-[#0f172a]/90 rounded-xl sm:rounded-2xl p-4 sm:p-6 md:p-8 shadow-sm dark:shadow-[0_8px_32px_rgba(0,0,0,0.5)] border border-slate-100 dark:border-white/10 transition-colors duration-500";
   const headerClass = "text-base sm:text-lg md:text-xl font-bold text-slate-800 dark:text-slate-100";
@@ -28,11 +29,24 @@ export default function Dashboard({ data, onReset }) {
         
         {/* Pills / Tags */}
         <div className="flex flex-wrap items-center gap-3">
-          {summary?.techStack?.map((tech, idx) => (
-            <span key={idx} className="px-4 py-1.5 bg-blue-50 dark:bg-blue-500/10 text-blue-600 dark:text-blue-400 rounded-full text-sm font-semibold border border-blue-100 dark:border-blue-500/20 shadow-sm transition-colors duration-500">
-              {tech}
-            </span>
-          ))}
+          <div className="flex items-center gap-2 mr-2 text-slate-500 dark:text-slate-400">
+             <Blocks size={18} />
+             <span className="text-sm font-semibold uppercase tracking-wider">Tech Stack:</span>
+          </div>
+          {summary?.techStack?.map((tech, idx) => {
+            const name = typeof tech === 'object' ? tech.name : tech;
+            const version = typeof tech === 'object' ? tech.version : null;
+            return (
+              <span key={idx} className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-50 dark:bg-blue-500/10 text-blue-700 dark:text-blue-300 rounded-lg text-sm font-semibold border border-blue-200 dark:border-blue-500/20 shadow-sm transition-colors duration-500 hover:shadow-md hover:border-blue-300">
+                {name}
+                {version && version !== 'Unknown' && (
+                  <span className="bg-white/50 dark:bg-black/20 text-[10px] px-1.5 py-0.5 rounded ml-1 font-mono text-blue-600 dark:text-blue-400">
+                    v{version.replace(/[\^~>]/g, '')}
+                  </span>
+                )}
+              </span>
+            );
+          })}
         </div>
 
         {/* Core Summary Text */}
@@ -64,27 +78,34 @@ export default function Dashboard({ data, onReset }) {
         )}
       </div>
 
-      {/* --- M1: FOLDER STRUCTURE --- */}
+      {/* --- M1: FOLDER STRUCTURE (GITHUB LIKE) --- */}
       <div className={panelClass}>
-        <div className="flex items-center gap-3 mb-8">
-          <FolderTree size={24} className={iconClass} />
-          <h3 className={headerClass}>Folder Structure</h3>
+        <div className="flex items-center justify-between mb-8">
+          <div className="flex items-center gap-3">
+            <FolderTree size={24} className={iconClass} />
+            <h3 className={headerClass}>File Explorer</h3>
+          </div>
         </div>
-        <div className="flex flex-col gap-5">
-          {m1?.map((item, idx) => (
-            <div key={idx} className="flex flex-col border-l-[3px] border-blue-400 dark:border-blue-500 pl-6 py-1 relative hover:bg-slate-50/50 dark:hover:bg-slate-800/50 rounded-r-xl transition-colors">
-              <div className="absolute w-4 h-4 bg-white dark:bg-slate-900 border-4 border-blue-400 dark:border-blue-500 rounded-full -left-[10px] top-2 shadow-sm transition-colors duration-500"></div>
-              <div className="font-bold text-slate-800 dark:text-slate-200 text-lg flex items-center gap-3 mb-1">
-                <div className="bg-blue-50 dark:bg-blue-500/10 text-blue-600 dark:text-blue-400 p-2 rounded-lg transition-colors duration-500">
-                  <FolderTree size={20} />
+        
+        {fileTree && fileTree.length > 0 ? (
+          <GitHubTree fileTree={fileTree} />
+        ) : (
+          <div className="flex flex-col gap-5">
+            {m1?.map((item, idx) => (
+              <div key={idx} className="flex flex-col border-l-[3px] border-blue-400 dark:border-blue-500 pl-6 py-1 relative hover:bg-slate-50/50 dark:hover:bg-slate-800/50 rounded-r-xl transition-colors">
+                <div className="absolute w-4 h-4 bg-white dark:bg-slate-900 border-4 border-blue-400 dark:border-blue-500 rounded-full -left-[10px] top-2 shadow-sm transition-colors duration-500"></div>
+                <div className="font-bold text-slate-800 dark:text-slate-200 text-lg flex items-center gap-3 mb-1">
+                  <div className="bg-blue-50 dark:bg-blue-500/10 text-blue-600 dark:text-blue-400 p-2 rounded-lg transition-colors duration-500">
+                    <FolderTree size={20} />
+                  </div>
+                  {item.folder}
                 </div>
-                {item.folder}
+                <p className="text-slate-500 dark:text-slate-400 text-[15px] leading-relaxed ml-[52px] transition-colors duration-500">{item.description}</p>
               </div>
-              <p className="text-slate-500 dark:text-slate-400 text-[15px] leading-relaxed ml-[52px] transition-colors duration-500">{item.description}</p>
-            </div>
-          ))}
-          {(!m1 || m1.length === 0) && <p className="text-slate-500 dark:text-slate-400 italic">No folder structure available.</p>}
-        </div>
+            ))}
+            {(!m1 || m1.length === 0) && <p className="text-slate-500 dark:text-slate-400 italic">No folder structure available.</p>}
+          </div>
+        )}
       </div>
 
       {/* --- M2: ENTRY POINT & LIFECYCLE --- */}
