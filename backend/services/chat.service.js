@@ -11,30 +11,37 @@ class ChatService {
       
       const paths = treeData.map(item => item.path);
       const filteredPaths = paths.filter(p => !p.includes('node_modules') && !p.includes('.git/') && !p.includes('dist/') && !p.includes('build/'));
-      const topLevelPaths = filteredPaths.filter(p => p.split('/').length <= 2).join('\n');
+      // Limit to 100 paths to prevent Groq/Llama token limit crashes on large repos
+      const topLevelPaths = filteredPaths.filter(p => p.split('/').length <= 2).slice(0, 100).join('\n');
 
       let readmeContent = '';
       const readmePath = filteredPaths.find(p => p.toLowerCase() === 'readme.md');
       if (readmePath) {
         try {
           const c = await githubService.getFileContent(owner, repo, branch, readmePath);
-          readmeContent = `README.md snippet:\n${c.split('\n').slice(0, 150).join('\n')}`;
+          // Limit to 40 lines to prevent Groq/Llama context window or tokens-per-minute limits
+          readmeContent = `README.md snippet:\n${c.split('\n').slice(0, 40).join('\n')}`;
         } catch(e) {}
       }
 
       const prompt = `
-        You are an expert AI coding assistant helping a user understand a GitHub repository (${owner}/${repo}).
+        You are an expert AI coding assistant.
         
-        Repository Context:
+        USER QUESTION: "${question}"
+        
+        INSTRUCTIONS:
+        1. Answer the USER QUESTION directly and concisely. 
+        2. DO NOT output a general summary of the repository unless the user specifically asks for it.
+        3. Keep your answer brief, friendly, and straight to the point.
+        4. Use simple text formatting (e.g. lists, short paragraphs) to make it readable.
+        
+        Here is some context about the repository (${owner}/${repo}) to help you if needed:
+        ---
         Root Files & Folders:
         ${topLevelPaths}
 
         ${readmeContent}
-
-        User Question: ${question}
-
-        Answer the user's question clearly, concisely, and accurately based on the context provided.
-        Format your response nicely with markdown (e.g. bolding, code blocks, lists if applicable).
+        ---
       `;
 
       const response = await llmService.generateResponse(prompt, provider);

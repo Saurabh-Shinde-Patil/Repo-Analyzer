@@ -1,0 +1,5 @@
+# Local Development
+# VITE_API_URL=http://localhost:5000
+
+# Production (Render Backend URL)
+VITE_API_URL=https://repo-analyzer-backend-r5po.onrender.com

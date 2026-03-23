@@ -12,6 +12,7 @@ dotenv.config();
 
 const errorMiddleware = require('./middlewares/error.middleware');
 const analyzeRoutes = require('./routes/analyze.routes');
+const subscriptionRoutes = require('./routes/subscription.routes');
 const AppError = require('./utils/AppError');
 
 const app = express();
@@ -22,6 +23,7 @@ app.use(express.json());
 
 // Routes
 app.use('/api/analyze', analyzeRoutes);
+app.use('/api/subscribe', subscriptionRoutes);
 
 // Handle undefined routes
 app.use((req, res, next) => {
