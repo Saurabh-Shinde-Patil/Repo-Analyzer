@@ -8,4 +8,13 @@ router.post('/', analyzeController.analyzeRepo);
 // POST /api/analyze/chat
 router.post('/chat', analyzeController.chatRepo);
 
+// GET /api/analyze/file?githubUrl=...&filePath=...
+router.get('/file', analyzeController.getFileContent);
+
+// GET /api/analyze/stats?githubUrl=...
+router.get('/stats', analyzeController.getRepoStats);
+
+// GET /api/analyze/readme?githubUrl=...
+router.get('/readme', analyzeController.getReadme);
+
 module.exports = router;

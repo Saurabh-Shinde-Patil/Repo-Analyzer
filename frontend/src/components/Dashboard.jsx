@@ -1,344 +1,737 @@
-import { FolderTree, PlayCircle, Network, ArrowRight, ShieldAlert, FileCode, CheckCircle, BrainCircuit, FileSearch, BookOpen, Flame, ArrowDown, Globe, KeyRound, Home, Blocks } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
+import {
+  LayoutDashboard, FolderOpen, Network, Shield, Globe,
+  RotateCcw, Blocks, BookOpen, Flame, PlayCircle, ArrowRight,
+  ShieldAlert, FileCode, CheckCircle, KeyRound, ChevronRight,
+  Copy, Check, FileText, Loader2
+} from 'lucide-react';
 import GitHubTree from './GitHubTree';
+import { getReadme } from '../services/api';
 
-export default function Dashboard({ data, onReset }) {
-  // Expected structure based on new JSON schema from backend
-  const { summary, b2, m1, m2, m3, criticalFiles, bugs, apiEndpoints, envVars, fileTree } = data;
+const TABS = [
+  { id: 'overview',      label: 'Overview',      icon: LayoutDashboard },
+  { id: 'explorer',      label: 'Explorer',       icon: FolderOpen },
+  { id: 'architecture',  label: 'Architecture',   icon: Network },
+  { id: 'security',      label: 'Security',       icon: Shield },
+  { id: 'api',           label: 'API & Env',      icon: Globe },
+  { id: 'readme',        label: 'README',          icon: FileText },
+];
 
-  const panelClass = "bg-white dark:bg-[#0f172a]/90 rounded-xl sm:rounded-2xl p-4 sm:p-6 md:p-8 shadow-sm dark:shadow-[0_8px_32px_rgba(0,0,0,0.5)] border border-slate-100 dark:border-white/10 transition-colors duration-500";
-  const headerClass = "text-base sm:text-lg md:text-xl font-bold text-slate-800 dark:text-slate-100";
-  const subTextClass = "text-slate-600 dark:text-slate-400 text-sm sm:text-base";
-  const iconClass = "text-slate-400 dark:text-slate-500";
+// ── Helper: Copy button ──────────────────────────────────────────────────────
+function CopyButton({ text }) {
+  const [copied, setCopied] = useState(false);
+  const handleCopy = () => {
+    navigator.clipboard.writeText(text).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    });
+  };
+  return (
+    <button
+      onClick={handleCopy}
+      className="p-1.5 rounded-lg transition-all duration-200"
+      style={{
+        background: 'var(--surface2)',
+        border: '1px solid rgba(255,255,255,0.08)',
+        color: copied ? '#10B981' : 'var(--text3)',
+      }}
+    >
+      {copied ? <Check size={13} /> : <Copy size={13} />}
+    </button>
+  );
+}
+
+// ── Tab: Overview ────────────────────────────────────────────────────────────
+function OverviewTab({ summary, repo }) {
+  if (!summary) return <EmptyState label="No overview data available." />;
 
   return (
-    <div className="w-full max-w-4xl mx-auto flex flex-col gap-6 sm:gap-8 md:gap-10 animate-in fade-in slide-in-from-bottom-8 duration-700 pb-10 sm:pb-20">
-      
-      {/* Back to Home Button */}
-      <div className="flex justify-center">
-        <button
-          onClick={onReset}
-          className="group inline-flex items-center gap-2.5 px-6 py-3 rounded-full bg-white dark:bg-slate-800/80 border border-slate-200 dark:border-white/10 text-slate-700 dark:text-slate-200 font-semibold text-sm shadow-sm hover:shadow-md hover:border-emerald-400 dark:hover:border-emerald-500/50 hover:text-emerald-600 dark:hover:text-emerald-400 transition-all duration-300 hover:-translate-y-0.5"
+    <div className="flex flex-col gap-6">
+      {/* Repo title */}
+      {repo && (
+        <div className="flex items-center gap-3">
+          <span
+            className="text-lg font-mono font-bold"
+            style={{
+              background: 'linear-gradient(135deg, #818CF8, #C084FC)',
+              WebkitBackgroundClip: 'text',
+              WebkitTextFillColor: 'transparent',
+            }}
+          >
+            {repo}
+          </span>
+          <span className="badge badge-indigo">Analyzed</span>
+        </div>
+      )}
+
+      {/* Summary text */}
+      <div
+        className="p-5 rounded-xl text-base leading-relaxed"
+        style={{
+          background: 'var(--card-bg)',
+          border: '1px solid var(--border)',
+          color: 'var(--text2)',
+        }}
+      >
+        {summary.summary}
+      </div>
+
+      {/* Architecture badge */}
+      {summary.architecture && (
+        <div className="flex items-center gap-3">
+          <div className="badge badge-violet">
+            <BookOpen size={12} />
+            {summary.architecture} Architecture
+          </div>
+        </div>
+      )}
+
+      {/* Tech Stack */}
+      {summary.techStack?.length > 0 && (
+        <div className="flex flex-col gap-3">
+          <div className="flex items-center gap-2 text-sm font-semibold" style={{ color: 'var(--text3)' }}>
+            <Blocks size={15} />
+            <span>Tech Stack</span>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            {summary.techStack.map((tech, i) => {
+              const name = typeof tech === 'object' ? tech.name : tech;
+              const version = typeof tech === 'object' ? tech.version : null;
+              return (
+                <span
+                  key={i}
+                  className="badge badge-cyan text-xs"
+                >
+                  {name}
+                  {version && version !== 'Unknown' && (
+                    <span className="opacity-60 ml-1 font-mono">v{version.replace(/[\^~>]/g, '')}</span>
+                  )}
+                </span>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* Key Design Decisions */}
+      {summary.keyDesignDecisions?.length > 0 && (
+        <div
+          className="p-5 rounded-xl"
+          style={{
+            background: 'rgba(245,158,11,0.06)',
+            border: '1px solid rgba(245,158,11,0.15)',
+          }}
         >
-          <Home size={18} className="transition-transform duration-300 group-hover:-translate-x-0.5" />
-          Analyze Another Repo
-        </button>
-      </div>
-      
-      {/* --- B3: HEADER SUMMARIES & DESIGN DECISIONS --- */}
-      <div className={`${panelClass} flex flex-col gap-6`}>
-        
-        {/* Pills / Tags */}
-        <div className="flex flex-wrap items-center gap-3">
-          <div className="flex items-center gap-2 mr-2 text-slate-500 dark:text-slate-400">
-             <Blocks size={18} />
-             <span className="text-sm font-semibold uppercase tracking-wider">Tech Stack:</span>
+          <div className="flex items-center gap-2 font-semibold mb-3" style={{ color: '#FCD34D' }}>
+            <Flame size={16} />
+            Key Design Decisions
           </div>
-          {summary?.techStack?.map((tech, idx) => {
-            const name = typeof tech === 'object' ? tech.name : tech;
-            const version = typeof tech === 'object' ? tech.version : null;
-            return (
-              <span key={idx} className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-50 dark:bg-blue-500/10 text-blue-700 dark:text-blue-300 rounded-lg text-sm font-semibold border border-blue-200 dark:border-blue-500/20 shadow-sm transition-colors duration-500 hover:shadow-md hover:border-blue-300">
-                {name}
-                {version && version !== 'Unknown' && (
-                  <span className="bg-white/50 dark:bg-black/20 text-[10px] px-1.5 py-0.5 rounded ml-1 font-mono text-blue-600 dark:text-blue-400">
-                    v{version.replace(/[\^~>]/g, '')}
-                  </span>
-                )}
-              </span>
-            );
-          })}
+          <ul className="flex flex-col gap-2">
+            {summary.keyDesignDecisions.map((d, i) => (
+              <li key={i} className="flex items-start gap-2.5 text-sm" style={{ color: '#D97706' }}>
+                <ChevronRight size={14} className="mt-0.5 shrink-0 opacity-60" />
+                {d}
+              </li>
+            ))}
+          </ul>
         </div>
+      )}
+    </div>
+  );
+}
 
-        {/* Core Summary Text */}
-        <p className={`${subTextClass} leading-relaxed text-sm sm:text-base md:text-lg transition-colors duration-500`}>
-          {summary?.summary}
-        </p>
-
-        {/* Architecture Pill */}
-        {summary?.architecture && (
-          <div className="inline-flex w-fit items-center gap-2 px-4 py-2 bg-slate-50 dark:bg-slate-800/50 text-slate-700 dark:text-slate-300 rounded-full text-sm font-medium border border-slate-200 dark:border-slate-700 transition-colors duration-500">
-            <BookOpen size={16} className={iconClass} />
-            <span>{summary.architecture} Architecture</span>
-          </div>
-        )}
-
-        {/* Key Design Decisions */}
-        {summary?.keyDesignDecisions && summary.keyDesignDecisions.length > 0 && (
-          <div className="mt-4 p-5 bg-amber-50 dark:bg-amber-500/10 border border-amber-100 dark:border-amber-500/20 rounded-xl transition-colors duration-500">
-            <h4 className="font-bold text-amber-800 dark:text-amber-400 flex items-center gap-2 mb-3">
-              <Flame size={18} />
-              Key Design Decisions
-            </h4>
-            <ul className="list-disc list-inside text-amber-700 dark:text-amber-200/80 space-y-2 text-sm">
-              {summary.keyDesignDecisions.map((decision, idx) => (
-                <li key={idx} className="leading-relaxed">{decision}</li>
-              ))}
-            </ul>
-          </div>
-        )}
-      </div>
-
-      {/* --- M1: FOLDER STRUCTURE (GITHUB LIKE) --- */}
-      <div className={panelClass}>
-        <div className="flex items-center justify-between mb-8">
-          <div className="flex items-center gap-3">
-            <FolderTree size={24} className={iconClass} />
-            <h3 className={headerClass}>File Explorer</h3>
-          </div>
-        </div>
-        
-        {fileTree && fileTree.length > 0 ? (
-          <GitHubTree fileTree={fileTree} />
-        ) : (
-          <div className="flex flex-col gap-5">
-            {m1?.map((item, idx) => (
-              <div key={idx} className="flex flex-col border-l-[3px] border-blue-400 dark:border-blue-500 pl-6 py-1 relative hover:bg-slate-50/50 dark:hover:bg-slate-800/50 rounded-r-xl transition-colors">
-                <div className="absolute w-4 h-4 bg-white dark:bg-slate-900 border-4 border-blue-400 dark:border-blue-500 rounded-full -left-[10px] top-2 shadow-sm transition-colors duration-500"></div>
-                <div className="font-bold text-slate-800 dark:text-slate-200 text-lg flex items-center gap-3 mb-1">
-                  <div className="bg-blue-50 dark:bg-blue-500/10 text-blue-600 dark:text-blue-400 p-2 rounded-lg transition-colors duration-500">
-                    <FolderTree size={20} />
+// ── Tab: Architecture ────────────────────────────────────────────────────────
+function ArchitectureTab({ m2, b2, m3 }) {
+  return (
+    <div className="flex flex-col gap-8">
+      {/* Entry Point & Flow */}
+      <Section title="Entry Point & Lifecycle" icon={PlayCircle} iconColor="#A5B4FC">
+        {m2 ? (
+          <>
+            <div
+              className="inline-flex items-center gap-2 px-4 py-2 rounded-lg mb-6 font-mono text-sm font-semibold"
+              style={{
+                background: 'rgba(139,92,246,0.1)',
+                border: '1px solid rgba(139,92,246,0.25)',
+                color: '#C4B5FD',
+              }}
+            >
+              <PlayCircle size={15} />
+              {m2.entryFile || 'Unknown Entry Point'}
+            </div>
+            <div className="flex flex-col items-center gap-2">
+              {m2.steps?.map((step, i) => (
+                <div key={i} className="flex flex-col items-center w-full max-w-xl">
+                  <div
+                    className="w-full flex items-center gap-4 p-4 rounded-xl"
+                    style={{
+                      background: 'var(--card-bg)',
+                      border: '1px solid var(--border)',
+                    }}
+                  >
+                    <div
+                      className="w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold shrink-0"
+                      style={{ background: 'rgba(139,92,246,0.2)', color: '#A78BFA' }}
+                    >
+                      {i + 1}
+                    </div>
+                    <span className="text-sm" style={{ color: 'var(--text2)' }}>{step}</span>
                   </div>
-                  {item.folder}
+                  {i < m2.steps.length - 1 && (
+                    <div className="h-4 w-px" style={{ background: 'rgba(139,92,246,0.3)' }} />
+                  )}
                 </div>
-                <p className="text-slate-500 dark:text-slate-400 text-[15px] leading-relaxed ml-[52px] transition-colors duration-500">{item.description}</p>
+              ))}
+            </div>
+          </>
+        ) : <EmptyState label="No entry point data." />}
+      </Section>
+
+      {/* Runtime Request Flow */}
+      <Section title="Runtime Request Flow" icon={Network} iconColor="#67E8F9">
+        {b2?.length > 0 ? (
+          <div className="flex flex-wrap items-center gap-2">
+            {b2.map((step, i) => (
+              <div key={i} className="flex items-center gap-2">
+                <span
+                  className="px-4 py-2 rounded-lg text-sm font-medium"
+                  style={{
+                    background: 'rgba(34,211,238,0.08)',
+                    border: '1px solid rgba(34,211,238,0.15)',
+                    color: '#67E8F9',
+                  }}
+                >
+                  {step}
+                </span>
+                {i < b2.length - 1 && <ArrowRight size={16} style={{ color: '#164E63' }} />}
               </div>
             ))}
-            {(!m1 || m1.length === 0) && <p className="text-slate-500 dark:text-slate-400 italic">No folder structure available.</p>}
           </div>
-        )}
-      </div>
+        ) : <EmptyState label="No request flow data." />}
+      </Section>
 
-      {/* --- M2: ENTRY POINT & LIFECYCLE --- */}
-      <div className={panelClass}>
-        <div className="flex items-center gap-3 mb-8">
-          <PlayCircle size={24} className={iconClass} />
-          <h3 className={headerClass}>Entry Point & Flow</h3>
-        </div>
-        <div className="inline-flex items-center gap-2 sm:gap-3 px-3 sm:px-5 py-2 sm:py-3 border border-purple-200 dark:border-purple-500/30 bg-purple-50 dark:bg-purple-500/10 rounded-xl text-purple-700 dark:text-purple-300 font-semibold mb-4 sm:mb-8 shadow-sm transition-colors duration-500 text-sm sm:text-base break-all">
-          <PlayCircle size={20} />
-          {m2?.entryFile || 'Unknown Entry Point'}
-        </div>
+      {/* Dependency Mapping */}
+      <Section title="Dependency Mapping" icon={Network} iconColor="#6EE7B7">
+        {m3?.length > 0 ? (
+          <DependencyGraph m3={m3} />
+        ) : <EmptyState label="No dependency data." />}
+      </Section>
+    </div>
+  );
+}
 
-        <div className="flex flex-col items-center w-full px-4">
-          {m2?.steps?.map((step, idx) => (
-            <div key={idx} className="flex flex-col items-center w-full">
-              <div className="w-full bg-white dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 hover:border-purple-300 dark:hover:border-purple-500/50 rounded-2xl p-5 flex items-center gap-5 shadow-sm transition-all hover:shadow-md">
-                <div className="flex items-center justify-center w-8 h-8 rounded-full bg-purple-100 dark:bg-purple-500/20 text-purple-700 dark:text-purple-300 font-bold shrink-0 transition-colors duration-500">
-                  {idx + 1}
-                </div>
-                <div className="text-slate-700 dark:text-slate-300 text-[15px] flex-1 leading-relaxed transition-colors duration-500">{step}</div>
-              </div>
-              {idx < m2.steps.length - 1 && (
-                <div className="h-6 w-0.5 bg-gradient-to-b from-purple-200 to-purple-400 dark:from-purple-500/30 dark:to-purple-500/60 my-1"></div>
-              )}
-            </div>
-          ))}
-          {(!m2?.steps || m2.steps.length === 0) && <p className="text-slate-500 dark:text-slate-400 italic">No execution steps found.</p>}
-        </div>
-      </div>
+function DependencyGraph({ m3 }) {
+  const grouped = m3.reduce((acc, curr) => {
+    const source = curr.source || curr.file || 'Unknown';
+    const target = curr.target || curr.dependsOn;
+    if (!acc[source]) acc[source] = [];
+    if (target && !acc[source].includes(target)) acc[source].push(target);
+    return acc;
+  }, {});
 
-      {/* --- B2: RUNTIME REQUEST FLOW --- */}
-      <div className={panelClass}>
-        <div className="flex items-center gap-3 mb-8">
-          <Network size={24} className={iconClass} />
-          <h3 className={headerClass}>Runtime Request Flow</h3>
-        </div>
-
-        <div className="flex flex-wrap items-center gap-2 px-0 sm:px-4">
-          {b2?.map((step, idx) => (
-            <div key={idx} className="flex items-center gap-2">
-              <div className="bg-gradient-to-r from-emerald-50 to-teal-50 dark:from-emerald-500/10 dark:to-teal-500/10 border border-emerald-200 dark:border-emerald-500/20 px-4 py-2 rounded-lg text-emerald-800 dark:text-emerald-300 font-medium shadow-sm flex items-center gap-2 transition-colors duration-500">
-                <div className="w-2 h-2 rounded-full bg-emerald-400"></div>
-                {step}
-              </div>
-              {idx < b2.length - 1 && (
-                <ArrowRight size={20} className="text-emerald-300 dark:text-emerald-500/50" />
-              )}
-            </div>
-          ))}
-          {(!b2 || b2.length === 0) && <p className="text-slate-500 dark:text-slate-400 italic">No request flow available.</p>}
-        </div>
-      </div>
-
-      {/* --- M3: DEPENDENCY MAPPING --- */}
-      <div className={panelClass}>
-        <div className="flex items-center gap-3 mb-8">
-          <Network size={24} className={iconClass} />
-          <h3 className={headerClass}>Dependency Mapping</h3>
-        </div>
-        <div className="flex flex-col gap-8 w-full">
-          {m3 && m3.length > 0 ? (() => {
-            const grouped = m3.reduce((acc, curr) => {
-              const source = curr.source || curr.file || 'Unknown';
-              const target = curr.target || curr.dependsOn;
-              if (!acc[source]) acc[source] = [];
-              if (target && !acc[source].includes(target)) {
-                acc[source].push(target);
-              }
-              return acc;
-            }, {});
-            
-            return Object.entries(grouped).map(([source, targets], idx) => (
-              <div key={idx} className="flex flex-col w-full bg-slate-50/50 dark:bg-slate-800/30 rounded-2xl p-6 border border-slate-100 dark:border-white/5 transition-colors duration-500">
-                <div className="font-bold text-slate-800 dark:text-slate-200 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-600 px-5 py-2.5 rounded-xl w-fit flex items-center gap-3 shadow-sm mb-4 transition-colors duration-500">
-                  <BookOpen size={20} className="text-emerald-500"/>
-                  {source}
-                </div>
-                <div className="flex flex-col border-l-2 border-emerald-200 dark:border-emerald-500/30 pl-8 ml-5 gap-4 relative">
-                  {targets.map((t, tIdx) => (
-                    <div key={tIdx} className="flex items-center gap-4 relative w-full">
-                      <div className="absolute w-8 border-t-2 border-emerald-200 dark:border-emerald-500/30 -left-8"></div>
-                      <div className="bg-white dark:bg-slate-800 border text-[14px] font-mono border-slate-200 dark:border-slate-700 px-4 py-2 rounded-lg text-slate-600 dark:text-slate-300 shadow-sm w-full max-w-lg hover:border-emerald-300 dark:hover:border-emerald-500/50 transition-colors">
-                        {t}
-                      </div>
-                    </div>
-                  ))}
-                  {targets.length === 0 && <span className="text-slate-400 dark:text-slate-500 italic text-sm">No child dependencies</span>}
-                </div>
-              </div>
-            ));
-          })() : <p className="text-slate-500 dark:text-slate-400 italic">No dependencies mapped.</p>}
-        </div>
-      </div>
-
-      {/* --- B1: CRITICAL FILES --- */}
-      <div className={panelClass}>
-        <div className="flex items-center gap-3 mb-8">
-          <Flame size={24} className={iconClass} />
-          <h3 className={headerClass}>Critical Files</h3>
-        </div>
-        
-        <div className="flex flex-col gap-6">
-          {criticalFiles?.map((crit, idx) => (
-            <div key={idx} className="flex flex-col gap-2 border-b border-slate-50 dark:border-white/5 pb-6 last:border-0 last:pb-0 transition-colors duration-500">
-              <div className="flex items-center gap-2 text-red-500 dark:text-red-400 font-mono text-sm bg-red-50 dark:bg-red-500/10 w-fit px-3 py-1 rounded transition-colors duration-500">
-                <BookOpen size={16} />
-                {crit.file}
-              </div>
-              <p className="text-slate-600 dark:text-slate-300 pl-1 transition-colors duration-500">{crit.reason}</p>
-            </div>
-          ))}
-        </div>
-      </div>
-
-      {/* --- BUG FINDER (EXTRA FEATURE) --- */}
-      <div className={panelClass}>
-        <div className="flex items-center justify-between mb-8">
-          <div className="flex items-center gap-3">
-            <ShieldAlert size={24} className="text-red-500" />
-            <h3 className={headerClass}>Security & Bug Scan</h3>
+  return (
+    <div className="flex flex-col gap-4">
+      {Object.entries(grouped).map(([source, targets], i) => (
+        <div
+          key={i}
+          className="p-4 rounded-xl"
+          style={{ background: 'var(--card-bg)', border: '1px solid var(--border)' }}
+        >
+          <div
+            className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg mb-3 font-mono text-sm font-semibold"
+            style={{ background: 'rgba(16,185,129,0.1)', border: '1px solid rgba(16,185,129,0.2)', color: '#6EE7B7' }}
+          >
+            {source}
           </div>
-          <span className="px-3 py-1 bg-red-50 dark:bg-red-500/10 text-red-600 dark:text-red-400 rounded-full text-xs font-bold border border-red-100 dark:border-red-500/20 uppercase tracking-wide transition-colors duration-500">Beta Feature</span>
+          <div className="flex flex-col gap-2 pl-4 border-l-2" style={{ borderColor: 'rgba(16,185,129,0.2)' }}>
+            {targets.map((t, j) => (
+              <span
+                key={j}
+                className="font-mono text-xs px-3 py-1.5 rounded-lg w-fit"
+                style={{
+                  background: 'var(--card-bg)',
+                  border: '1px solid var(--border)',
+                  color: 'var(--text3)',
+                }}
+              >
+                {t}
+              </span>
+            ))}
+          </div>
         </div>
+      ))}
+    </div>
+  );
+}
 
-        {bugs && bugs.length > 0 ? (
-          <div className="grid gap-3 sm:gap-4 grid-cols-1 md:grid-cols-2">
-            {bugs.map((bug, idx) => {
-              const severityColor = bug.severity?.toLowerCase() === 'high' ? 'bg-red-50 dark:bg-red-500/10 border-red-200 dark:border-red-500/20 text-red-700 dark:text-red-400' : 
-                                  bug.severity?.toLowerCase() === 'medium' ? 'bg-amber-50 dark:bg-amber-500/10 border-amber-200 dark:border-amber-500/20 text-amber-700 dark:text-amber-400' : 
-                                  'bg-blue-50 dark:bg-blue-500/10 border-blue-200 dark:border-blue-500/20 text-blue-700 dark:text-blue-400';
+// ── Tab: Security ────────────────────────────────────────────────────────────
+function SecurityTab({ bugs, criticalFiles }) {
+  const severityStyle = (sev) => {
+    if (!sev) return { bg: 'rgba(99,102,241,0.1)', border: 'rgba(99,102,241,0.2)', color: '#A5B4FC' };
+    const s = sev.toLowerCase();
+    if (s === 'high') return { bg: 'rgba(239,68,68,0.1)', border: 'rgba(239,68,68,0.2)', color: '#FCA5A5' };
+    if (s === 'medium') return { bg: 'rgba(245,158,11,0.1)', border: 'rgba(245,158,11,0.2)', color: '#FCD34D' };
+    return { bg: 'rgba(34,211,238,0.08)', border: 'rgba(34,211,238,0.15)', color: '#67E8F9' };
+  };
 
+  return (
+    <div className="flex flex-col gap-8">
+      {/* Bug Scan */}
+      <Section
+        title="Security & Bug Scan"
+        icon={ShieldAlert}
+        iconColor="#FCA5A5"
+        badge={<span className="badge badge-red text-xs">Beta</span>}
+      >
+        {bugs?.length > 0 ? (
+          <div className="grid gap-3 md:grid-cols-2">
+            {bugs.map((bug, i) => {
+              const s = severityStyle(bug.severity);
               return (
-                <div key={idx} className={`border rounded-xl p-5 shadow-sm flex flex-col gap-3 transition-transform hover:-translate-y-1 ${severityColor} duration-500`}>
+                <div
+                  key={i}
+                  className="p-4 rounded-xl flex flex-col gap-3 transition-transform duration-200 hover:-translate-y-0.5"
+                  style={{ background: s.bg, border: `1px solid ${s.border}` }}
+                >
                   <div className="flex items-start justify-between">
-                    <div className="flex items-center gap-2 font-mono text-xs font-bold bg-white/50 dark:bg-black/20 px-2 py-1 rounded transition-colors duration-500">
-                      <FileCode size={14} />
+                    <div className="flex items-center gap-2 font-mono text-xs font-bold px-2 py-1 rounded-lg" style={{ background: 'rgba(0,0,0,0.2)', color: s.color }}>
+                      <FileCode size={12} />
                       {bug.file}
                     </div>
-                    <span className="uppercase text-[10px] font-black tracking-wider px-2 py-0.5 rounded-full bg-white/80 dark:bg-black/40 transition-colors duration-500">
+                    <span className="text-xs font-black uppercase px-2 py-0.5 rounded-full" style={{ background: 'rgba(0,0,0,0.3)', color: s.color }}>
                       {bug.severity}
                     </span>
                   </div>
-                  <p className="text-sm font-semibold">{bug.issue}</p>
-                  <div className="mt-auto pt-3 border-t border-black/5 dark:border-white/5 transition-colors duration-500">
-                    <p className="text-xs italic"><span className="font-bold">Fix: </span>{bug.suggestion}</p>
+                  <p className="text-sm font-semibold" style={{ color: s.color }}>{bug.issue}</p>
+                  <div className="pt-2 border-t text-xs" style={{ borderColor: 'var(--surface2)', color: s.color, opacity: 0.7 }}>
+                    <span className="font-bold">Fix: </span>{bug.suggestion}
                   </div>
                 </div>
               );
             })}
           </div>
         ) : (
-          <div className="p-6 bg-emerald-50 dark:bg-emerald-500/10 border border-emerald-100 dark:border-emerald-500/20 rounded-xl text-emerald-700 dark:text-emerald-400 flex items-center justify-center gap-3 shadow-inner transition-colors duration-500">
-            <CheckCircle size={20} />
-            <span className="font-medium animate-pulse">No obvious bugs or vulnerabilities detected in context!</span>
+          <div
+            className="flex items-center gap-3 p-4 rounded-xl"
+            style={{ background: 'rgba(16,185,129,0.08)', border: '1px solid rgba(16,185,129,0.15)' }}
+          >
+            <CheckCircle size={20} style={{ color: '#10B981' }} />
+            <span className="font-medium" style={{ color: '#6EE7B7' }}>No obvious bugs or vulnerabilities detected</span>
           </div>
         )}
-      </div>
+      </Section>
 
-      {/* --- API ENDPOINTS MAP --- */}
-      <div className={panelClass}>
-        <div className="flex items-center gap-3 mb-6 sm:mb-8">
-          <Globe size={24} className={iconClass} />
-          <h3 className={headerClass}>API Endpoints Map</h3>
-        </div>
+      {/* Critical Files */}
+      <Section title="Critical Files" icon={Flame} iconColor="#FCD34D">
+        {criticalFiles?.length > 0 ? (
+          <div className="flex flex-col gap-3">
+            {criticalFiles.map((cf, i) => (
+              <div
+                key={i}
+                className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4 p-4 rounded-xl"
+                style={{ background: 'var(--card-bg)', border: '1px solid var(--border)' }}
+              >
+                <code
+                  className="text-xs font-mono px-3 py-1.5 rounded-lg shrink-0"
+                  style={{ background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.2)', color: '#FCA5A5' }}
+                >
+                  {cf.file}
+                </code>
+                <span className="text-sm" style={{ color: 'var(--text2)' }}>{cf.reason}</span>
+              </div>
+            ))}
+          </div>
+        ) : <EmptyState label="No critical files identified." />}
+      </Section>
+    </div>
+  );
+}
 
-        {apiEndpoints && apiEndpoints.length > 0 ? (
+// ── Tab: API & Env ───────────────────────────────────────────────────────────
+function APITab({ apiEndpoints, envVars }) {
+  const METHOD_STYLE = {
+    GET:    { bg: 'rgba(16,185,129,0.15)', color: '#6EE7B7' },
+    POST:   { bg: 'rgba(99,102,241,0.15)', color: '#A5B4FC' },
+    PUT:    { bg: 'rgba(245,158,11,0.15)', color: '#FCD34D' },
+    PATCH:  { bg: 'rgba(249,115,22,0.15)', color: '#FDBA74' },
+    DELETE: { bg: 'rgba(239,68,68,0.15)',  color: '#FCA5A5' },
+  };
+
+  return (
+    <div className="flex flex-col gap-8">
+      {/* API Endpoints */}
+      <Section title="API Endpoints" icon={Globe} iconColor="#A5B4FC">
+        {apiEndpoints?.length > 0 ? (
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
-                <tr className="border-b border-slate-200 dark:border-white/10">
-                  <th className="text-left py-3 px-2 sm:px-4 font-semibold text-slate-500 dark:text-slate-400 text-xs uppercase tracking-wider">Method</th>
-                  <th className="text-left py-3 px-2 sm:px-4 font-semibold text-slate-500 dark:text-slate-400 text-xs uppercase tracking-wider">Route</th>
-                  <th className="text-left py-3 px-2 sm:px-4 font-semibold text-slate-500 dark:text-slate-400 text-xs uppercase tracking-wider hidden sm:table-cell">Handler</th>
-                  <th className="text-left py-3 px-2 sm:px-4 font-semibold text-slate-500 dark:text-slate-400 text-xs uppercase tracking-wider hidden md:table-cell">Description</th>
+                <tr style={{ borderBottom: '1px solid var(--border)' }}>
+                  {['Method', 'Route', 'Handler', 'Description'].map(h => (
+                    <th
+                      key={h}
+                      className="text-left py-3 px-3 text-xs font-semibold uppercase tracking-wider"
+                      style={{ color: 'var(--text4)' }}
+                    >
+                      {h}
+                    </th>
+                  ))}
                 </tr>
               </thead>
               <tbody>
-                {apiEndpoints.map((ep, idx) => {
-                  const methodColor = {
-                    'GET': 'bg-emerald-100 dark:bg-emerald-500/20 text-emerald-700 dark:text-emerald-400',
-                    'POST': 'bg-blue-100 dark:bg-blue-500/20 text-blue-700 dark:text-blue-400',
-                    'PUT': 'bg-amber-100 dark:bg-amber-500/20 text-amber-700 dark:text-amber-400',
-                    'PATCH': 'bg-orange-100 dark:bg-orange-500/20 text-orange-700 dark:text-orange-400',
-                    'DELETE': 'bg-red-100 dark:bg-red-500/20 text-red-700 dark:text-red-400',
-                  }[ep.method?.toUpperCase()] || 'bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-300';
-
+                {apiEndpoints.map((ep, i) => {
+                  const ms = METHOD_STYLE[ep.method?.toUpperCase()] || { bg: 'var(--border)', color: 'var(--text2)' };
                   return (
-                    <tr key={idx} className="border-b border-slate-100 dark:border-white/5 hover:bg-slate-50 dark:hover:bg-white/[0.02] transition-colors">
-                      <td className="py-3 px-2 sm:px-4">
-                        <span className={`px-2 py-1 rounded text-xs font-bold uppercase ${methodColor} transition-colors duration-500`}>
+                    <tr
+                      key={i}
+                      className="transition-colors duration-150"
+                      style={{ borderBottom: '1px solid rgba(255,255,255,0.04)' }}
+                    >
+                      <td className="py-3 px-3">
+                        <span
+                          className="px-2 py-1 rounded text-xs font-black uppercase"
+                          style={{ background: ms.bg, color: ms.color }}
+                        >
                           {ep.method}
                         </span>
                       </td>
-                      <td className="py-3 px-2 sm:px-4 font-mono text-xs sm:text-sm text-slate-800 dark:text-slate-200 transition-colors duration-500">{ep.path}</td>
-                      <td className="py-3 px-2 sm:px-4 font-mono text-xs text-slate-500 dark:text-slate-400 hidden sm:table-cell transition-colors duration-500">{ep.handler}</td>
-                      <td className="py-3 px-2 sm:px-4 text-slate-600 dark:text-slate-400 text-xs hidden md:table-cell transition-colors duration-500">{ep.description}</td>
+                      <td className="py-3 px-3 font-mono text-xs" style={{ color: 'var(--text2)' }}>{ep.path}</td>
+                      <td className="py-3 px-3 font-mono text-xs" style={{ color: 'var(--text3)' }}>{ep.handler}</td>
+                      <td className="py-3 px-3 text-xs" style={{ color: 'var(--text3)' }}>{ep.description}</td>
                     </tr>
                   );
                 })}
               </tbody>
             </table>
           </div>
-        ) : (
-          <p className="text-slate-500 dark:text-slate-400 italic text-sm">No API endpoints detected in this repository.</p>
-        )}
-      </div>
+        ) : <EmptyState label="No API endpoints detected." />}
+      </Section>
 
-      {/* --- ENVIRONMENT VARIABLES GUIDE --- */}
-      <div className={panelClass}>
-        <div className="flex items-center gap-3 mb-6 sm:mb-8">
-          <KeyRound size={24} className={iconClass} />
-          <h3 className={headerClass}>Environment Variables</h3>
-        </div>
-
-        {envVars && envVars.length > 0 ? (
-          <div className="flex flex-col gap-3">
-            {envVars.map((ev, idx) => (
-              <div key={idx} className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4 p-3 sm:p-4 rounded-xl bg-slate-50 dark:bg-slate-800/40 border border-slate-100 dark:border-white/5 transition-colors duration-500">
-                <code className="text-sm font-bold font-mono text-violet-600 dark:text-violet-400 bg-violet-50 dark:bg-violet-500/10 px-3 py-1 rounded-lg w-fit transition-colors duration-500">
+      {/* Environment Variables */}
+      <Section title="Environment Variables" icon={KeyRound} iconColor="#C4B5FD">
+        {envVars?.length > 0 ? (
+          <div className="flex flex-col gap-2">
+            {envVars.map((ev, i) => (
+              <div
+                key={i}
+                className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4 p-3 rounded-xl"
+                style={{ background: 'var(--card-bg)', border: '1px solid var(--surface2)' }}
+              >
+                <code
+                  className="text-xs font-bold font-mono px-3 py-1.5 rounded-lg shrink-0"
+                  style={{ background: 'rgba(139,92,246,0.1)', border: '1px solid rgba(139,92,246,0.2)', color: '#C4B5FD' }}
+                >
                   {ev.name}
                 </code>
-                <span className="text-xs text-slate-400 dark:text-slate-500 font-mono hidden sm:inline">→</span>
-                <span className="text-xs font-mono text-slate-500 dark:text-slate-400 transition-colors duration-500">{ev.usedIn}</span>
-                <span className="text-sm text-slate-600 dark:text-slate-300 sm:ml-auto transition-colors duration-500">{ev.description}</span>
+                <span className="hidden sm:inline text-xs" style={{ color: 'var(--text4)' }}>→</span>
+                <span className="text-xs font-mono" style={{ color: 'var(--text3)' }}>{ev.usedIn}</span>
+                <span className="text-sm sm:ml-auto" style={{ color: 'var(--text2)' }}>{ev.description}</span>
               </div>
             ))}
           </div>
-        ) : (
-          <p className="text-slate-500 dark:text-slate-400 italic text-sm">No environment variables detected in this repository.</p>
-        )}
+        ) : <EmptyState label="No environment variables detected." />}
+      </Section>
+    </div>
+  );
+}
+
+// ── Tab: README ──────────────────────────────────────────────────────────────
+function ReadmeTab({ githubUrl }) {
+  const [content, setContent] = useState(null);
+  const [filename, setFilename] = useState(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    if (!githubUrl) { setLoading(false); return; }
+    getReadme(githubUrl)
+      .then(data => { setContent(data.content); setFilename(data.filename); })
+      .catch(() => setContent(null))
+      .finally(() => setLoading(false));
+  }, [githubUrl]);
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-16 gap-3" style={{ color: 'var(--text3)' }}>
+        <Loader2 size={20} className="animate-spin" />
+        <span className="text-sm">Fetching README...</span>
+      </div>
+    );
+  }
+
+  if (!content) {
+    return <EmptyState label="No README file found in this repository." />;
+  }
+
+  // Simple markdown renderer
+  const renderMarkdown = (text) => {
+    const lines = text.split('\n');
+    const elements = [];
+    let i = 0;
+    let codeBlock = null;
+    let codeLines = [];
+
+    while (i < lines.length) {
+      const line = lines[i];
+
+      // Code block
+      if (line.startsWith('```')) {
+        if (codeBlock !== null) {
+          // end code block
+          elements.push(
+            <pre key={i}
+              className="p-4 rounded-xl overflow-x-auto text-xs leading-relaxed my-3"
+              style={{
+                background: 'var(--code-bg)',
+                border: '1px solid var(--border)',
+                color: '#A5B4FC',
+                fontFamily: 'var(--font-mono)',
+              }}
+            >
+              {codeLines.join('\n')}
+            </pre>
+          );
+          codeBlock = null;
+          codeLines = [];
+        } else {
+          codeBlock = line.slice(3).trim() || 'text';
+        }
+        i++; continue;
+      }
+
+      if (codeBlock !== null) { codeLines.push(line); i++; continue; }
+
+      // Headings
+      const h1 = line.match(/^# (.+)/);
+      if (h1) {
+        elements.push(<h1 key={i} className="text-2xl font-black mt-6 mb-3" style={{ color: 'var(--text)' }}>{h1[1]}</h1>);
+        i++; continue;
+      }
+      const h2 = line.match(/^## (.+)/);
+      if (h2) {
+        elements.push(
+          <h2 key={i} className="text-lg font-bold mt-5 mb-2 pb-2"
+            style={{ color: 'var(--text)', borderBottom: '1px solid var(--border)' }}>
+            {h2[1]}
+          </h2>
+        );
+        i++; continue;
+      }
+      const h3 = line.match(/^### (.+)/);
+      if (h3) {
+        elements.push(<h3 key={i} className="text-base font-semibold mt-4 mb-1.5" style={{ color: 'var(--text2)' }}>{h3[1]}</h3>);
+        i++; continue;
+      }
+
+      // List items
+      const li = line.match(/^[-*] (.+)/);
+      if (li) {
+        elements.push(
+          <div key={i} className="flex items-start gap-2.5 my-1">
+            <span className="mt-1.5 w-1.5 h-1.5 rounded-full shrink-0" style={{ background: '#6366F1' }} />
+            <span className="text-sm" style={{ color: 'var(--text2)' }}>{renderInline(li[1])}</span>
+          </div>
+        );
+        i++; continue;
+      }
+
+      // Numbered list
+      const ol = line.match(/^\d+\. (.+)/);
+      if (ol) {
+        const num = line.match(/^(\d+)\./)[1];
+        elements.push(
+          <div key={i} className="flex items-start gap-2.5 my-1">
+            <span className="text-xs font-mono shrink-0 mt-0.5" style={{ color: '#6366F1', minWidth: 20 }}>{num}.</span>
+            <span className="text-sm" style={{ color: 'var(--text2)' }}>{renderInline(ol[1])}</span>
+          </div>
+        );
+        i++; continue;
+      }
+
+      // Horizontal rule
+      if (line.match(/^---+/) || line.match(/^===+/)) {
+        elements.push(<hr key={i} className="my-4" style={{ borderColor: 'var(--border)' }} />);
+        i++; continue;
+      }
+
+      // Blank line
+      if (line.trim() === '') {
+        elements.push(<div key={i} className="h-2" />);
+        i++; continue;
+      }
+
+      // Regular paragraph
+      elements.push(
+        <p key={i} className="text-sm leading-relaxed" style={{ color: 'var(--text2)' }}>
+          {renderInline(line)}
+        </p>
+      );
+      i++;
+    }
+
+    return elements;
+  };
+
+  const renderInline = (text) => {
+    // Handle bold, italic, code
+    const parts = text.split(/(`[^`]+`|\*\*[^*]+\*\*|\*[^*]+\*)/g);
+    return parts.map((part, i) => {
+      if (part.startsWith('`') && part.endsWith('`')) {
+        return <code key={i} className="px-1.5 py-0.5 rounded text-xs font-mono"
+          style={{ background: 'rgba(99,102,241,0.12)', color: '#A5B4FC' }}>{part.slice(1, -1)}</code>;
+      }
+      if (part.startsWith('**') && part.endsWith('**')) {
+        return <strong key={i} style={{ color: 'var(--text)', fontWeight: 700 }}>{part.slice(2, -2)}</strong>;
+      }
+      if (part.startsWith('*') && part.endsWith('*')) {
+        return <em key={i} style={{ color: 'var(--text2)' }}>{part.slice(1, -1)}</em>;
+      }
+      return part;
+    });
+  };
+
+  return (
+    <div className="flex flex-col gap-3">
+      {/* Header */}
+      <div className="flex items-center gap-2 mb-2">
+        <FileText size={16} style={{ color: '#A5B4FC' }} />
+        <span className="text-sm font-semibold" style={{ color: 'var(--text2)' }}>{filename}</span>
+        <span className="badge badge-zinc text-xs ml-auto">Raw Markdown</span>
       </div>
 
+      {/* Rendered content */}
+      <div
+        className="p-5 rounded-xl overflow-y-auto custom-scrollbar"
+        style={{
+          background: 'var(--card-bg)',
+          border: '1px solid var(--border)',
+          maxHeight: '600px',
+        }}
+      >
+        {renderMarkdown(content)}
+      </div>
     </div>
+  );
+}
+
+// ── Shared sub-components ────────────────────────────────────────────────────
+function Section({ title, icon: Icon, iconColor, badge, children }) {
+  return (
+    <div className="flex flex-col gap-4">
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2.5">
+          <Icon size={18} style={{ color: iconColor }} />
+          <h3 className="text-base font-bold" style={{ color: 'var(--text)' }}>{title}</h3>
+        </div>
+        {badge}
+      </div>
+      {children}
+    </div>
+  );
+}
+
+function EmptyState({ label }) {
+  return (
+    <p className="text-sm italic" style={{ color: 'var(--text4)' }}>{label}</p>
+  );
+}
+
+// ── Main Dashboard ───────────────────────────────────────────────────────────
+export default function Dashboard({ data, onReset }) {
+  const [activeTab, setActiveTab] = useState('overview');
+
+  const { summary, b2, m1, m2, m3, criticalFiles, bugs, apiEndpoints, envVars, fileTree, repo } = data;
+
+  const tabContent = {
+    overview:     <OverviewTab summary={summary} repo={repo} />,
+    explorer:     <GitHubTree fileTree={fileTree} m1={m1} githubUrl={data.repoUrl} />,
+    architecture: <ArchitectureTab m2={m2} b2={b2} m3={m3} />,
+    security:     <SecurityTab bugs={bugs} criticalFiles={criticalFiles} />,
+    api:          <APITab apiEndpoints={apiEndpoints} envVars={envVars} />,
+    readme:       <ReadmeTab githubUrl={data.repoUrl} />,
+  };
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.5 }}
+      className="w-full flex flex-col gap-4"
+    >
+      {/* Dashboard header */}
+      <div className="flex items-center justify-between flex-wrap gap-3">
+        <div className="flex items-center gap-3">
+          <div
+            className="w-8 h-8 rounded-xl flex items-center justify-center"
+            style={{ background: 'linear-gradient(135deg, rgba(99,102,241,0.3), rgba(139,92,246,0.3))' }}
+          >
+            <LayoutDashboard size={16} style={{ color: '#A5B4FC' }} />
+          </div>
+          <div>
+            <h2 className="text-base font-bold" style={{ color: 'var(--text)' }}>
+              Analysis Complete
+            </h2>
+            {repo && (
+              <p className="text-xs font-mono" style={{ color: 'var(--text3)' }}>{repo}</p>
+            )}
+          </div>
+        </div>
+        <button
+          onClick={onReset}
+          className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold transition-all duration-200"
+          style={{
+            background: 'var(--card-bg)',
+            border: '1px solid rgba(255,255,255,0.08)',
+            color: 'var(--text3)',
+          }}
+          onMouseEnter={e => e.currentTarget.style.color = '#A5B4FC'}
+          onMouseLeave={e => e.currentTarget.style.color = 'var(--text3)'}
+        >
+          <RotateCcw size={14} />
+          New Analysis
+        </button>
+      </div>
+
+      {/* Tab bar */}
+      <div
+        className="flex items-center gap-1 p-1.5 rounded-2xl overflow-x-auto"
+        style={{
+          background: 'var(--card-bg)',
+          border: '1px solid var(--border)',
+        }}
+      >
+        {TABS.map(({ id, label, icon: Icon }) => (
+          <button
+            key={id}
+            onClick={() => setActiveTab(id)}
+            className={`tab-btn ${activeTab === id ? 'active' : ''}`}
+          >
+            <Icon size={15} />
+            <span className="hidden sm:inline">{label}</span>
+            <span className="sm:hidden text-xs">{label.slice(0, 3)}</span>
+          </button>
+        ))}
+      </div>
+
+      {/* Tab content */}
+      <div
+        className="p-6 rounded-2xl min-h-[300px]"
+        style={{
+          background: 'var(--card-bg)',
+          border: '1px solid var(--border)',
+        }}
+      >
+        <AnimatePresence mode="wait">
+          <motion.div
+            key={activeTab}
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -8 }}
+            transition={{ duration: 0.2 }}
+          >
+            {tabContent[activeTab]}
+          </motion.div>
+        </AnimatePresence>
+      </div>
+    </motion.div>
   );
 }
