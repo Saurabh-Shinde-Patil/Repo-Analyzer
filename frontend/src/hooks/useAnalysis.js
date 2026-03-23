@@ -13,11 +13,12 @@ export const useAnalysis = () => {
     setError(null);
     setCurrentUrl(url);
     setCurrentProvider(provider);
+    setAnalysisResult(null);
     try {
       const data = await analyzeRepository(url, provider);
       setAnalysisResult(data);
     } catch (err) {
-      setError(err.message);
+      setError(err.message || 'Analysis failed. Please try again.');
     } finally {
       setIsLoading(false);
     }
@@ -32,5 +33,13 @@ export const useAnalysis = () => {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
-  return { analysisResult, isLoading, error, currentUrl, currentProvider, handleAnalyze, resetAnalysis };
+  return {
+    analysisResult,
+    isLoading,
+    error,
+    currentUrl,
+    currentProvider,
+    handleAnalyze,
+    resetAnalysis,
+  };
 };

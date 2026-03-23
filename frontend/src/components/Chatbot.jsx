@@ -1,123 +1,289 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
 import axios from 'axios';
-import { Send, Bot, User, Loader2, Sparkles } from 'lucide-react';
+import { Send, Bot, User, Loader2, Sparkles, Trash2, Brain, MessageSquare } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
+const STORAGE_KEY = (url) => `agnix_chat_${btoa(url || '').slice(0, 20)}`;
+
+const INITIAL_MESSAGE = {
+  role: 'assistant',
+  content: "Hi! I have full context on this repository. Ask me about the architecture, specific files, how to set it up, or anything else you're curious about.",
+};
+
+const QUICK_PROMPTS = [
+  'How does this project work?',
+  'What is the entry point?',
+  'How do I run this project?',
+  'What are the main dependencies?',
+];
+
 export default function Chatbot({ repositoryUrl, provider }) {
-  const [messages, setMessages] = useState([
-    { role: 'assistant', content: 'Hi! I have context on this repository. What would you like to know?' }
-  ]);
+  const storageKey = STORAGE_KEY(repositoryUrl);
+
+  // Load chat history from localStorage on mount
+  const [messages, setMessages] = useState(() => {
+    try {
+      const stored = localStorage.getItem(storageKey);
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      }
+    } catch {}
+    return [INITIAL_MESSAGE];
+  });
+
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [memoryLoaded, setMemoryLoaded] = useState(false);
   const messagesEndRef = useRef(null);
+  const inputRef = useRef(null);
 
-  const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  };
+  // Detect if memory was restored
+  useEffect(() => {
+    try {
+      const stored = localStorage.getItem(storageKey);
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        if (Array.isArray(parsed) && parsed.length > 1) {
+          setMemoryLoaded(true);
+          setTimeout(() => setMemoryLoaded(false), 4000);
+        }
+      }
+    } catch {}
+  }, [storageKey]);
+
+  // Persist to localStorage whenever messages change
+  useEffect(() => {
+    if (messages.length > 0) {
+      try {
+        localStorage.setItem(storageKey, JSON.stringify(messages));
+      } catch {}
+    }
+  }, [messages, storageKey]);
 
   useEffect(() => {
-    scrollToBottom();
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
-  const handleSend = async (e) => {
-    e.preventDefault();
-    if (!input.trim() || isLoading) return;
-
-    const userMessage = input.trim();
+  const handleSend = useCallback(async (text) => {
+    const userMessage = (text || input).trim();
+    if (!userMessage || isLoading) return;
     setInput('');
-    setMessages(prev => [...prev, { role: 'user', content: userMessage }]);
+
+    const newMessages = [...messages, { role: 'user', content: userMessage }];
+    setMessages(newMessages);
     setIsLoading(true);
 
     try {
       const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+
+      // Pass full history (excluding the initial greeting) to the backend
+      const historyForBackend = newMessages
+        .filter(m => m !== INITIAL_MESSAGE)
+        .slice(-12); // Last 12 messages for context
+
       const response = await axios.post(`${API_URL}/api/analyze/chat`, {
         githubUrl: repositoryUrl,
-        provider: provider,
-        question: userMessage
+        provider,
+        question: userMessage,
+        history: historyForBackend.slice(0, -1), // all except the last user message
       });
 
       if (response.data.status === 'success') {
         setMessages(prev => [...prev, { role: 'assistant', content: response.data.data.response }]);
       } else {
-        throw new Error('Chatbot response failed');
+        throw new Error('Chat response failed');
       }
-    } catch (error) {
-      setMessages(prev => [...prev, { role: 'assistant', content: 'Sorry, I encountered an error connecting to the server. Please try again.' }]);
+    } catch {
+      setMessages(prev => [...prev, {
+        role: 'assistant',
+        content: 'Sorry, I ran into an error. Please try again.',
+      }]);
     } finally {
       setIsLoading(false);
+      inputRef.current?.focus();
     }
+  }, [input, isLoading, messages, repositoryUrl, provider]);
+
+  const handleClearHistory = () => {
+    const fresh = [INITIAL_MESSAGE];
+    setMessages(fresh);
+    try { localStorage.removeItem(storageKey); } catch {}
   };
 
+  const storedCount = messages.filter(m => m.role !== 'assistant' || m !== INITIAL_MESSAGE).length;
+
   return (
-    <div className="flex flex-col h-full bg-white dark:bg-[#0f172a]/95 rounded-2xl shadow-xl dark:shadow-[0_8px_32px_rgba(0,0,0,0.6)] border border-slate-200 dark:border-white/10 overflow-hidden backdrop-blur-sm transition-all duration-300 hover:shadow-2xl">
+    <div
+      className="flex flex-col h-full rounded-2xl overflow-hidden"
+      style={{
+        background: 'var(--surface)',
+        border: '1px solid var(--border)',
+        boxShadow: '0 8px 40px rgba(0,0,0,0.5)',
+      }}
+    >
       {/* Header */}
-      <div className="bg-gradient-to-r from-emerald-500 to-teal-600 dark:from-emerald-600 dark:to-teal-800 p-4 shrink-0 flex items-center justify-between">
+      <div
+        className="flex items-center justify-between px-4 py-3.5 shrink-0"
+        style={{
+          background: 'linear-gradient(135deg, rgba(99,102,241,0.15), rgba(139,92,246,0.1))',
+          borderBottom: '1px solid var(--border)',
+        }}
+      >
         <div className="flex items-center gap-3">
-          <div className="bg-white/20 p-2 rounded-xl backdrop-blur-md">
-            <Bot size={22} className="text-white drop-shadow-sm" />
+          <div
+            className="w-9 h-9 rounded-xl flex items-center justify-center"
+            style={{ background: 'linear-gradient(135deg, #6366F1, #8B5CF6)' }}
+          >
+            <Bot size={18} className="text-white" />
           </div>
           <div>
-            <h3 className="font-bold text-white text-[15px] drop-shadow-sm flex items-center gap-2">Repo Agent <Sparkles size={14} className="text-yellow-300" /></h3>
-            <p className="text-emerald-50 text-xs opacity-90">Ask me anything about code</p>
+            <div className="flex items-center gap-2">
+              <h3 className="font-bold text-sm" style={{ color: 'var(--text)' }}>
+                Repo Agent
+              </h3>
+              <Sparkles size={12} style={{ color: '#FCD34D' }} />
+            </div>
+            <p className="text-xs" style={{ color: 'var(--text3)' }}>
+              Ask anything about this codebase
+            </p>
           </div>
         </div>
-        <div className="flex gap-1.5 items-center">
-            <div className="w-2 h-2 rounded-full bg-emerald-300 animate-pulse shadow-[0_0_8px_rgba(110,231,183,1)]"></div>
-            <span className="text-[10px] font-bold text-emerald-100 uppercase tracking-widest">Online</span>
+        <div className="flex items-center gap-2">
+          {/* Memory indicator */}
+          {storedCount > 1 && (
+            <div className="flex items-center gap-1.5 badge badge-indigo">
+              <Brain size={11} />
+              <span className="text-xs">{Math.floor(storedCount / 2)} msgs</span>
+            </div>
+          )}
+          {/* Online dot */}
+          <div className="flex items-center gap-1.5">
+            <div
+              className="w-2 h-2 rounded-full"
+              style={{
+                background: '#10B981',
+                boxShadow: '0 0 6px rgba(16,185,129,0.8)',
+                animation: 'pulse 2s ease-in-out infinite',
+              }}
+            />
+            <span className="text-xs font-bold uppercase tracking-widest" style={{ color: '#064E3B' }}>
+              Live
+            </span>
+          </div>
+          <button
+            onClick={handleClearHistory}
+            title="Clear chat history"
+            className="p-1.5 rounded-lg transition-all duration-200"
+            style={{ color: 'var(--text4)' }}
+            onMouseEnter={e => e.currentTarget.style.color = '#EF4444'}
+            onMouseLeave={e => e.currentTarget.style.color = 'var(--text4)'}
+          >
+            <Trash2 size={14} />
+          </button>
         </div>
       </div>
 
+      {/* Memory restored toast */}
+      <AnimatePresence>
+        {memoryLoaded && (
+          <motion.div
+            initial={{ opacity: 0, y: -10 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -10 }}
+            className="px-4 py-2 text-xs flex items-center gap-2"
+            style={{ background: 'rgba(99,102,241,0.1)', borderBottom: '1px solid rgba(99,102,241,0.15)', color: '#A5B4FC' }}
+          >
+            <Brain size={12} />
+            Previous conversation loaded from memory
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       {/* Messages */}
-      <div className="flex-1 overflow-y-auto p-4 sm:p-5 space-y-6 custom-scrollbar bg-slate-50/50 dark:bg-transparent">
-        <AnimatePresence>
+      <div className="flex-1 overflow-y-auto p-4 space-y-4 custom-scrollbar" style={{ background: 'transparent' }}>
+        <AnimatePresence initial={false}>
           {messages.map((msg, idx) => (
-            <motion.div 
-              key={idx} 
-              initial={{ opacity: 0, y: 10, scale: 0.95 }}
+            <motion.div
+              key={idx}
+              initial={{ opacity: 0, y: 10, scale: 0.97 }}
               animate={{ opacity: 1, y: 0, scale: 1 }}
-              transition={{ duration: 0.3, ease: 'easeOut' }}
-              className={`flex gap-3 max-w-[90%] ${msg.role === 'user' ? 'ml-auto flex-row-reverse' : 'mr-auto'}`}
+              transition={{ duration: 0.25, ease: 'easeOut' }}
+              className={`flex gap-3 ${msg.role === 'user' ? 'flex-row-reverse' : ''}`}
             >
-              <div className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 shadow-md ${
-                msg.role === 'user' 
-                  ? 'bg-blue-600 outline outline-2 outline-blue-200 dark:outline-blue-500/30' 
-                  : 'bg-emerald-500 outline outline-2 outline-emerald-200 dark:outline-emerald-500/30'
-              }`}>
-                {msg.role === 'user' ? <User size={16} className="text-white" /> : <Bot size={16} className="text-white" />}
+              {/* Avatar */}
+              <div
+                className="w-7 h-7 rounded-full flex items-center justify-center shrink-0"
+                style={{
+                  background: msg.role === 'user'
+                    ? 'linear-gradient(135deg, #3B82F6, #6366F1)'
+                    : 'linear-gradient(135deg, #6366F1, #8B5CF6)',
+                  boxShadow: `0 0 12px ${msg.role === 'user' ? 'rgba(99,102,241,0.3)' : 'rgba(139,92,246,0.3)'}`,
+                }}
+              >
+                {msg.role === 'user'
+                  ? <User size={14} className="text-white" />
+                  : <Bot size={14} className="text-white" />
+                }
               </div>
-              <div className={`p-3.5 rounded-2xl text-[14px] leading-relaxed shadow-sm ${
-                msg.role === 'user' 
-                  ? 'bg-blue-600 text-white rounded-tr-sm border border-blue-700/50' 
-                  : 'bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 rounded-tl-sm border border-slate-200 dark:border-white/10'
-              }`}>
-                {/* Parse basic markdown (just split by newlines for paragraphs for now) */}
+
+              {/* Bubble */}
+              <div
+                className="max-w-[82%] px-4 py-3 rounded-2xl text-sm leading-relaxed"
+                style={msg.role === 'user' ? {
+                  background: 'linear-gradient(135deg, rgba(99,102,241,0.3), rgba(139,92,246,0.25))',
+                  border: '1px solid rgba(99,102,241,0.25)',
+                  color: '#E2E8F0',
+                  borderTopRightRadius: '4px',
+                } : {
+                  background: 'var(--card-bg)',
+                  border: '1px solid var(--border)',
+                  color: 'var(--text2)',
+                  borderTopLeftRadius: '4px',
+                }}
+              >
                 {msg.content.split('\n').map((line, i) => (
-                  <p key={i} className={`mb-1 ${line.startsWith('-') || line.startsWith('1.') ? 'ml-4' : ''}`}>
-                    {msg.role === 'assistant' ? (
-                      // Super simplified markdown bold handling just for quick UI
-                      line.split('**').map((part, index) => index % 2 === 1 ? <strong key={index} className="text-slate-900 dark:text-white">{part}</strong> : part)
-                    ) : (
-                       line
-                    )}
+                  <p key={i} className={`${i > 0 ? 'mt-1.5' : ''} ${line.startsWith('- ') || line.match(/^\d+\./) ? 'ml-3' : ''}`}>
+                    {msg.role === 'assistant'
+                      ? line.split('**').map((part, j) =>
+                          j % 2 === 1
+                            ? <strong key={j} style={{ color: 'var(--text)' }}>{part}</strong>
+                            : part
+                        )
+                      : line
+                    }
                   </p>
                 ))}
               </div>
             </motion.div>
           ))}
-          
+
+          {/* Loading indicator */}
           {isLoading && (
-             <motion.div 
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              className="flex gap-3 max-w-[85%] mr-auto"
+            <motion.div
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="flex gap-3"
             >
-              <div className="w-8 h-8 rounded-full bg-emerald-500 flex items-center justify-center shrink-0 shadow-sm animate-pulse">
-                 <Bot size={16} className="text-white" />
+              <div
+                className="w-7 h-7 rounded-full flex items-center justify-center shrink-0"
+                style={{ background: 'linear-gradient(135deg, #6366F1, #8B5CF6)' }}
+              >
+                <Bot size={14} className="text-white" />
               </div>
-              <div className="p-4 rounded-2xl rounded-tl-none bg-white dark:bg-slate-800 border border-slate-200 dark:border-white/10 flex items-center gap-1.5 shadow-sm">
-                <div className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-bounce [animation-delay:-0.3s]"></div>
-                <div className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-bounce [animation-delay:-0.15s]"></div>
-                <div className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-bounce"></div>
+              <div
+                className="px-4 py-3 rounded-2xl rounded-tl-sm flex items-center gap-1.5"
+                style={{ background: 'var(--card-bg)', border: '1px solid var(--border)' }}
+              >
+                {[0, 150, 300].map(delay => (
+                  <motion.div
+                    key={delay}
+                    animate={{ y: [0, -4, 0] }}
+                    transition={{ duration: 0.6, repeat: Infinity, delay: delay / 1000 }}
+                    className="w-1.5 h-1.5 rounded-full"
+                    style={{ background: '#6366F1' }}
+                  />
+                ))}
               </div>
             </motion.div>
           )}
@@ -125,27 +291,72 @@ export default function Chatbot({ repositoryUrl, provider }) {
         <div ref={messagesEndRef} />
       </div>
 
-      {/* Input */}
-      <div className="p-3 sm:p-4 bg-white dark:bg-[#1e293b]/90 border-t border-slate-200 dark:border-white/10 backdrop-blur-md">
-        <form onSubmit={handleSend} className="relative flex items-center group">
-          <input
-            type="text"
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            placeholder="Ask about architecture, functions..."
-            disabled={isLoading}
-            className="w-full bg-slate-100 dark:bg-black/30 border border-slate-300 dark:border-white/10 rounded-full pl-5 pr-12 py-3 sm:py-3.5 text-sm outline-none focus:ring-2 focus:ring-emerald-500/50 focus:border-emerald-500 dark:focus:ring-emerald-500/40 text-slate-800 dark:text-slate-200 placeholder-slate-500 transition-all shadow-inner disabled:opacity-60"
-          />
+      {/* Quick prompts (show only if few messages) */}
+      {messages.length <= 2 && !isLoading && (
+        <div className="px-3 pb-2 flex flex-wrap gap-1.5">
+          {QUICK_PROMPTS.map((prompt) => (
+            <button
+              key={prompt}
+              onClick={() => handleSend(prompt)}
+              className="text-xs px-3 py-1.5 rounded-xl transition-all duration-150 font-medium"
+              style={{
+                background: 'rgba(99,102,241,0.08)',
+                border: '1px solid rgba(99,102,241,0.15)',
+                color: '#6366F1',
+              }}
+              onMouseEnter={e => {
+                e.currentTarget.style.background = 'rgba(99,102,241,0.15)';
+                e.currentTarget.style.color = '#A5B4FC';
+              }}
+              onMouseLeave={e => {
+                e.currentTarget.style.background = 'rgba(99,102,241,0.08)';
+                e.currentTarget.style.color = '#6366F1';
+              }}
+            >
+              {prompt}
+            </button>
+          ))}
+        </div>
+      )}
+
+      {/* Input bar */}
+      <div
+        className="p-3 shrink-0"
+        style={{ borderTop: '1px solid var(--border)', background: 'var(--card-bg)' }}
+      >
+        <form
+          onSubmit={(e) => { e.preventDefault(); handleSend(); }}
+          className="flex items-center gap-2"
+        >
+          <div className="flex-1 flex items-center gap-3 px-4 py-2.5 rounded-xl" style={{ background: 'var(--card-bg)', border: '1px solid var(--border)' }}>
+            <MessageSquare size={14} style={{ color: 'var(--text4)', flexShrink: 0 }} />
+            <input
+              ref={inputRef}
+              type="text"
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+              placeholder="Ask about architecture, files, setup..."
+              disabled={isLoading}
+              className="flex-1 bg-transparent border-none outline-none text-sm"
+              style={{ color: 'var(--text)', caretColor: '#6366F1' }}
+            />
+          </div>
           <button
             type="submit"
             disabled={!input.trim() || isLoading}
-            className={`absolute right-1.5 w-9 h-9 sm:w-10 sm:h-10 flex items-center justify-center rounded-full transition-all duration-300 ${
-              !input.trim() || isLoading 
-                ? 'bg-slate-300 dark:bg-slate-700 text-slate-500 dark:text-slate-400 cursor-not-allowed' 
-                : 'bg-emerald-500 hover:bg-emerald-600 text-white shadow-md hover:shadow-lg hover:-translate-y-0.5'
-            }`}
+            className="w-10 h-10 rounded-xl flex items-center justify-center transition-all duration-200 shrink-0"
+            style={{
+              background: !input.trim() || isLoading
+                ? 'var(--card-bg)'
+                : 'linear-gradient(135deg, #6366F1, #8B5CF6)',
+              border: '1px solid var(--border)',
+              boxShadow: !input.trim() || isLoading ? 'none' : '0 4px 16px rgba(99,102,241,0.4)',
+            }}
           >
-            {isLoading ? <Loader2 size={18} className="animate-spin" /> : <Send size={18} className="ml-0.5" />}
+            {isLoading
+              ? <Loader2 size={16} className="animate-spin" style={{ color: 'var(--text3)' }} />
+              : <Send size={16} style={{ color: !input.trim() ? 'var(--text4)' : 'white', marginLeft: '1px' }} />
+            }
           </button>
         </form>
       </div>

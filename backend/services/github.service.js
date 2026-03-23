@@ -61,7 +61,6 @@ class GitHubService {
       const response = await axios.get(`https://raw.githubusercontent.com/${owner}/${repo}/${branch}/${filePath}`, {
         headers: this.getHeaders()
       });
-      // Handle cases where response might not be a string (e.g., JSON files returned as objects by axios)
       if (typeof response.data === 'object') {
          return JSON.stringify(response.data, null, 2);
       }
@@ -69,6 +68,51 @@ class GitHubService {
     } catch (error) {
       throw new AppError(`Failed to fetch content for file: ${filePath}`, 404);
     }
+  }
+
+  // Fetches public repository stats (stars, forks, language, etc.)
+  async getRepoStats(owner, repo) {
+    try {
+      const response = await axios.get(`${this.apiBase}/repos/${owner}/${repo}`, {
+        headers: this.getHeaders()
+      });
+      const d = response.data;
+      return {
+        fullName: d.full_name,
+        description: d.description,
+        stars: d.stargazers_count,
+        forks: d.forks_count,
+        watchers: d.watchers_count,
+        openIssues: d.open_issues_count,
+        language: d.language,
+        topics: d.topics || [],
+        defaultBranch: d.default_branch,
+        updatedAt: d.updated_at,
+        pushedAt: d.pushed_at,
+        size: d.size,
+        license: d.license ? d.license.spdx_id : null,
+        homepage: d.homepage || null,
+        visibility: d.visibility,
+      };
+    } catch (error) {
+      throw new AppError('Failed to fetch repository stats.', 404);
+    }
+  }
+
+  // Fetches README content (tries common filenames)
+  async getReadme(owner, repo, branch) {
+    const candidates = ['README.md', 'readme.md', 'Readme.md', 'README.MD', 'README.rst', 'README.txt', 'README'];
+    for (const name of candidates) {
+      try {
+        const response = await axios.get(`https://raw.githubusercontent.com/${owner}/${repo}/${branch}/${name}`, {
+          headers: this.getHeaders()
+        });
+        return { content: response.data, filename: name };
+      } catch {
+        // try next
+      }
+    }
+    return { content: null, filename: null };
   }
 }
 
