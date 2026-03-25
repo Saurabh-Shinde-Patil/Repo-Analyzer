@@ -1,10 +1,10 @@
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
 
-export const analyzeRepository = async (githubUrl, provider) => {
+export const analyzeRepository = async (githubUrl, provider, mode = 'developer') => {
   const response = await fetch(`${API_URL}/api/analyze`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ githubUrl, provider }),
+    body: JSON.stringify({ githubUrl, provider, mode }),
   });
   const data = await response.json();
   if (!response.ok) {
