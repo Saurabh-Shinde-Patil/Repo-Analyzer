@@ -9,7 +9,7 @@ const STEPS = [
   { icon: Sparkles,  label: 'Building Insights',     sub: 'Security scan, API map, env vars & more',     color: '#6EE7B7', duration: 4000 },
 ];
 
-export default function LoadingAnalysis({ repoUrl }) {
+export default function LoadingAnalysis({ repoUrl, mode = 'developer' }) {
   const [currentStep, setCurrentStep] = useState(0);
   const [completedSteps, setCompletedSteps] = useState([]);
 
@@ -87,7 +87,7 @@ export default function LoadingAnalysis({ repoUrl }) {
           {repoName}
         </div>
         <h2 className="text-xl font-bold mb-1" style={{ color: 'var(--text)' }}>
-          Analyzing Repository
+          {mode === 'non-tech' ? 'Translating code into human language...' : 'Analyzing Repository'}
         </h2>
         <p className="text-sm" style={{ color: 'var(--text3)' }}>
           Typically 30–60 seconds · Please wait

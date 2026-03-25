@@ -1,15 +1,17 @@
 import { AnimatePresence, motion } from 'framer-motion';
 import Hero from '../components/Hero';
 import Dashboard from '../components/Dashboard';
+import NonTechDashboard from '../components/NonTechDashboard';
 import Chatbot from '../components/Chatbot';
 import LoadingAnalysis from '../components/LoadingAnalysis';
 import FeaturesSection from '../components/FeaturesSection';
 import RepoStatsBar from '../components/RepoStatsBar';
 import RecentRepos, { saveRecentRepo } from '../components/RecentRepos';
 import { useAnalysis } from '../hooks/useAnalysis';
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 
 export default function Home() {
+  const [mode, setMode] = useState('developer');
   const {
     analysisResult,
     isLoading,
@@ -30,11 +32,44 @@ export default function Home() {
   }, [analysisResult, currentUrl]);
 
   const handleSelectRecent = (url) => {
-    handleAnalyze(url, currentProvider || 'groq');
+    handleAnalyze(url, currentProvider || 'groq', mode);
   };
 
   return (
     <div className="flex flex-col gap-6 w-full">
+
+      {/* Mode Toggle */}
+      <AnimatePresence>
+        {!analysisResult && (
+          <motion.div
+            initial={{ opacity: 0, y: -10 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -10 }}
+            className="flex justify-center pt-8"
+            title={mode === 'developer' ? "Switch to Non-Tech Mode for simple explanation" : "Switch to Developer Mode"}
+          >
+            <div 
+              className="inline-flex items-center p-1.5 rounded-xl shadow-lg"
+              style={{ background: 'var(--surface2)', border: '1px solid var(--border)' }}
+            >
+              <button
+                onClick={() => setMode('developer')}
+                className={`px-6 py-2.5 text-sm font-semibold rounded-lg transition-all duration-300 ${mode === 'developer' ? 'shadow-md' : 'opacity-60 hover:opacity-100'}`}
+                style={mode === 'developer' ? { background: 'var(--card-bg)', color: '#A5B4FC', border: '1px solid rgba(139,92,246,0.5)' } : { color: 'var(--text3)', border: '1px solid transparent' }}
+              >
+                Developer Mode
+              </button>
+              <button
+                onClick={() => setMode('non-tech')}
+                className={`px-6 py-2.5 text-sm font-semibold rounded-lg transition-all duration-300 ${mode === 'non-tech' ? 'shadow-md' : 'opacity-60 hover:opacity-100'}`}
+                style={mode === 'non-tech' ? { background: 'var(--card-bg)', color: '#6EE7B7', border: '1px solid rgba(16,185,129,0.5)' } : { color: 'var(--text3)', border: '1px solid transparent' }}
+              >
+                Non-Tech Mode
+              </button>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* Hero — hide once results are in */}
       <AnimatePresence>
@@ -45,7 +80,7 @@ export default function Home() {
             exit={{ opacity: 0, y: -16 }}
             transition={{ duration: 0.35 }}
           >
-            <Hero onAnalyze={handleAnalyze} isLoading={isLoading} />
+            <Hero onAnalyze={(url, provider) => handleAnalyze(url, provider, mode)} isLoading={isLoading} />
           </motion.div>
         )}
       </AnimatePresence>
@@ -96,7 +131,7 @@ export default function Home() {
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
           >
-            <LoadingAnalysis repoUrl={currentUrl} />
+            <LoadingAnalysis repoUrl={currentUrl} mode={mode} />
           </motion.div>
         )}
       </AnimatePresence>
@@ -118,7 +153,11 @@ export default function Home() {
             {/* Dashboard + Chatbot */}
             <div className="flex flex-col xl:flex-row xl:items-start gap-5 w-full">
               <div className="flex-1 min-w-0">
-                <Dashboard data={analysisResult} onReset={resetAnalysis} />
+                {analysisResult.mode === 'non-tech' ? (
+                  <NonTechDashboard data={analysisResult} onReset={resetAnalysis} />
+                ) : (
+                  <Dashboard data={analysisResult} onReset={resetAnalysis} />
+                )}
               </div>
               <div
                 className="w-full xl:w-[400px] 2xl:w-[440px] shrink-0 xl:sticky xl:top-20"
