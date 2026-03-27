@@ -351,7 +351,6 @@ export default function Hero({ onAnalyze, isLoading }) {
                   <option value="gemini">✦ Gemini</option>
                   <option value="llama">🦙 Llama</option>
                   <option value="openai">◆ GPT-4o</option>
-                  <option value="sarvam">🇮🇳 Sarvam AI</option>
                 </select>
                 <button
                   type="submit"
