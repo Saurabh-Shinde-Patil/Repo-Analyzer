@@ -15,7 +15,7 @@ const extractJSON = (text) => {
 
 class AnalysisService {
   
-  async analyzeRepository(url, provider) {
+  async analyzeRepository(url, provider, mode = 'developer') {
     try {
       const { owner, repo } = githubService.parseRepoUrl(url);
       const branch = await githubService.getDefaultBranch(owner, repo);
@@ -69,7 +69,39 @@ class AnalysisService {
       }
 
       // 5. Generate Master Prompt
-      const prompt = `
+      let prompt = '';
+      if (mode === 'non-tech') {
+        prompt = `
+        You are an expert Software Communicator. I will provide you with data extracted from a GitHub repository (${owner}/${repo}).
+        You MUST analyze the entire dataset and respond with exactly ONE valid JSON object holding the required information.
+        Do not add Markdown text outside of the JSON. Do not add markdown codeblocks. Just raw valid JSON.
+
+        DATA EXCERPTS:
+        ---
+        README Knowledge:
+        ${readmeContent}
+
+        Config/Package Data:
+        ${pkgContent}
+
+        Root Files Summary:
+        ${topLevelPaths}
+        ---
+
+        Explain the given GitHub repository in simple, non-technical language. Avoid coding jargon.
+        Make the explanation understandable for a complete beginner or non-technical person.
+
+        EXPECTED JSON SCHEMA EXACT MATCH (Fill with real analyzed data based on the excerpts):
+        {
+          "overview": "<Explain what this project does in simple terms (max 3-4 lines)>",
+          "problem": "<What real-world problem does it solve?>",
+          "users": "<Who can use this project?>",
+          "use_case": "<Give one practical real-life example>",
+          "business_value": "<Why is this project useful or important?>"
+        }
+        `;
+      } else {
+        prompt = `
         You are an expert System Architect. I will provide you with data extracted from a GitHub repository (${owner}/${repo}).
         You MUST analyze the entire dataset and respond with exactly ONE valid JSON object holding all the required information.
         Do not add Markdown text outside of the JSON. Do not add markdown codeblocks. Just raw valid JSON.
@@ -139,13 +171,28 @@ class AnalysisService {
             { "file": "<path to critical file>", "reason": "<why it is the most critical logic file>" }
           ]
         }
-      `;
+        `;
+      }
 
       // Single API Call to completely evade 15 RPM / quota limits
       const llmResult = await llmService.generateResponse(prompt, provider);
       const parsedData = extractJSON(llmResult) || {};
 
+      if (mode === 'non-tech') {
+        return {
+          mode: 'non-tech',
+          overview: parsedData.overview || 'Failed to generate overview.',
+          problem: parsedData.problem || 'Not available.',
+          users: parsedData.users || 'Not available.',
+          use_case: parsedData.use_case || 'Not available.',
+          business_value: parsedData.business_value || 'Not available.',
+          repo: `${owner}/${repo}`,
+          fileTree: treeData
+        };
+      }
+
       return {
+        mode: 'developer',
         summary: parsedData.summary || { techStack: [], architecture: 'Unknown', keyDesignDecisions: [], summary: 'Failed to generate output due to AI hallucination.' },
         b2: parsedData.b2 || [],
         m1: parsedData.m1 || [],
